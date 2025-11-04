@@ -14,7 +14,7 @@ const app = express();
 app.use(express.json());
 app.use(express.static("public")); // serves any static files if needed
 
-// ✅ CORS allowlist – adjust these domains to match where your RustX UI is hosted
+// ✅ CORS allowlist – adjust these domains to match where your Fuchs UI is hosted
 app.use(
   cors({ origin: ["https://chat.openai.com", "https://ai-pandit.com"] })
 );
@@ -51,7 +51,7 @@ app.post("/ask", async (req: Request, res: Response) => {
     const message = req.body?.message as string | undefined;
     if (!message) return res.status(400).json({ error: "message required" });
 
-    // Run the RustX workflow
+    // Run the fuchs-agents workflow
     const result = await runWorkflow({ input_as_text: message });
 
     // If the result contains output_text, normalize to "text"
@@ -59,12 +59,12 @@ app.post("/ask", async (req: Request, res: Response) => {
       return res.json({
         text: (result as any).output_text,
         ...result,
-        served_by: "rustx-agent@render",
+        served_by: "fuchs-agent@render",
       });
     }
 
     // Otherwise, return whatever object the workflow produced
-    return res.json({ ...result, served_by: "rustx-agent@render" });
+    return res.json({ ...result, served_by: "fuchs-agent@render" });
   } catch (e: any) {
     console.error(e);
     return res
@@ -77,4 +77,4 @@ app.post("/ask", async (req: Request, res: Response) => {
 // 4️⃣ Server start
 // ====================================
 const port = Number(process.env.PORT || 3000);
-app.listen(port, () => console.log(`✅ RustX Agent running on :${port}`));
+app.listen(port, () => console.log(`✅ Fuchs Agent running on :${port}`));

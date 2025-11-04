@@ -1,6 +1,15 @@
-# Privacy Policy
+Privacy Policy
 
-This GPT uses the RustX Agent API hosted on Render to answer product and catalogue queries.
-User inputs are only sent to this API for generating responses and are not stored, shared, or used for any other purpose.
+This agent uses the Fuchs Agent API, powered by the OpenAI Agent Runtime and hosted on Render, to process and respond to user queries related to product information and catalogue data.
 
-No cookies, analytics, or tracking tools are used.
+When you interact with this agent:
+
+Your inputs are securely sent to the hosted API only for the purpose of generating relevant responses.
+
+No personal data, conversation history, or usage information is stored, shared, or reused beyond the scope of that single interaction.
+
+No cookies, analytics, or tracking tools are implemented in this agent or its API.
+
+No data is sold or shared with third parties.
+
+All requests are transient and processed in-memory to provide answers in real time.
