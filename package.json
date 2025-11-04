@@ -1,0 +1,25 @@
+{
+  "name": "rustx-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@openai/agents": "^0.1.9",
+    "@openai/guardrails": "^0.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.1.0",
+    "openai": "^6.3.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3"
+  }
+}
