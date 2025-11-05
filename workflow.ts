@@ -3,29 +3,6 @@ import { OpenAI } from "openai";
 import { runGuardrails } from "@openai/guardrails";
 import { z } from "zod";
 
-// ---------- Type definitions for guardrail helpers ----------
-type GuardrailInfo = {
-  guardrail_name?: string;
-  guardrailName?: string;
-  checked_text?: string;
-  anonymized_text?: string;
-  detected_entities?: Record<string, unknown>;
-  flagged_categories?: string[];
-  threshold?: number;
-  confidence?: number;
-  reasoning?: string;
-  hallucination_type?: string;
-  hallucinated_statements?: unknown;
-  verified_statements?: unknown;
-  error?: string;
-};
-
-type GuardrailResult = {
-  tripwireTriggered?: boolean;
-  executionFailed?: boolean;
-  info?: GuardrailInfo;
-};
-// ------------------------------------------------------------
 
 // Tool definitions
 const fileSearch = fileSearchTool([
@@ -88,29 +65,37 @@ const guardrailsConfig = {
 };
 const context = { guardrailLlm: client };
 
-// ---------- Guardrail helper functions (strict-safe) ----------
-function guardrailsHasTripwire(results: GuardrailResult[] | null | undefined): boolean {
+// Guardrails utils
+type GuardrailResult = { tripwireTriggered?: boolean; executionFailed?: boolean; info?: Record<string, any> };
+
+function guardrailsHasTripwire(results: GuardrailResult[] | undefined): boolean {
   return (results ?? []).some((r: GuardrailResult) => r?.tripwireTriggered === true);
 }
 
 function getGuardrailSafeText(
-  results: GuardrailResult[] | null | undefined,
+  results: GuardrailResult[] | undefined,
   fallbackText: string
 ): string {
-  for (const r of results ?? []) {
-    if (r?.info && ("checked_text" in r.info)) {
-      return (r.info.checked_text as string | undefined) ?? fallbackText;
+  // Prefer checked_text as the generic safe/processed text
+  for (const r of (results ?? []) as GuardrailResult[]) {
+    const info = r?.info as Record<string, any> | undefined;
+    if (info && "checked_text" in info) {
+      return (info as any).checked_text ?? fallbackText;
     }
   }
-  const pii = (results ?? []).find((r: GuardrailResult) => r?.info && "anonymized_text" in r.info);
-  return (pii?.info?.anonymized_text as string | undefined) ?? fallbackText;
+  // Fall back to PII-specific anonymized_text if present
+  const pii = (results ?? []).find((r: GuardrailResult) => {
+    const info = r?.info as Record<string, any> | undefined;
+    return !!(info && "anonymized_text" in info);
+  });
+  return (pii?.info as any)?.anonymized_text ?? fallbackText;
 }
 
-function buildGuardrailFailOutput(results: GuardrailResult[]) {
+function buildGuardrailFailOutput(results: GuardrailResult[] | undefined) {
   const get = (name: string) =>
     (results ?? []).find((r: GuardrailResult) => {
-      const info = r?.info ?? {};
-      const n = (info as any)?.guardrail_name ?? (info as any)?.guardrailName;
+      const info = (r?.info ?? {}) as Record<string, any>;
+      const n = info.guardrail_name ?? info.guardrailName;
       return n === name;
     });
 
@@ -121,35 +106,37 @@ function buildGuardrailFailOutput(results: GuardrailResult[]) {
 
   const detected = (pii?.info?.detected_entities ?? {}) as Record<string, unknown>;
   const piiCounts = Object.entries(detected)
-    .filter((entry): entry is [string, unknown[]] => Array.isArray(entry[1])) // ✅ legal predicate
-    .map(([k, v]) => `${k}:${v.length}`); // ✅ 'v' is now known to be an array
+    .filter((entry) => Array.isArray(entry[1]))
+    .map(([k, val]) => k + ":" + (val as unknown[]).length);
+
+  const thr = (jb?.info as any)?.threshold; // kept in case you log/use later
+  const conf = (jb?.info as any)?.confidence;
 
   return {
     pii: {
       failed: (piiCounts.length > 0) || pii?.tripwireTriggered === true,
       ...(piiCounts.length ? { detected_counts: piiCounts } : {}),
-      ...(pii?.executionFailed && pii?.info?.error ? { error: pii.info.error } : {}),
+      ...((pii?.executionFailed && (pii?.info as any)?.error) ? { error: (pii?.info as any).error } : {}),
     },
     moderation: {
-      failed: mod?.tripwireTriggered === true || ((mod?.info?.flagged_categories ?? []).length > 0),
-      ...(mod?.info?.flagged_categories ? { flagged_categories: mod.info.flagged_categories } : {}),
-      ...(mod?.executionFailed && mod?.info?.error ? { error: mod.info.error } : {}),
+      failed: mod?.tripwireTriggered === true || (((mod?.info as any)?.flagged_categories ?? []).length > 0),
+      ...(((mod?.info as any)?.flagged_categories) ? { flagged_categories: (mod?.info as any).flagged_categories } : {}),
+      ...((mod?.executionFailed && (mod?.info as any)?.error) ? { error: (mod?.info as any).error } : {}),
     },
     jailbreak: {
       failed: jb?.tripwireTriggered === true,
-      ...(jb?.executionFailed && jb?.info?.error ? { error: jb.info.error } : {}),
+      ...((jb?.executionFailed && (jb?.info as any)?.error) ? { error: (jb?.info as any).error } : {}),
     },
     hallucination: {
       failed: hal?.tripwireTriggered === true,
-      ...(hal?.info?.reasoning ? { reasoning: hal.info.reasoning } : {}),
-      ...(hal?.info?.hallucination_type ? { hallucination_type: hal.info.hallucination_type } : {}),
-      ...(hal?.info?.hallucinated_statements ? { hallucinated_statements: hal.info.hallucinated_statements } : {}),
-      ...(hal?.info?.verified_statements ? { verified_statements: hal.info.verified_statements } : {}),
-      ...(hal?.executionFailed && hal?.info?.error ? { error: hal.info.error } : {}),
+      ...(((hal?.info as any)?.reasoning) ? { reasoning: (hal?.info as any).reasoning } : {}),
+      ...(((hal?.info as any)?.hallucination_type) ? { hallucination_type: (hal?.info as any).hallucination_type } : {}),
+      ...(((hal?.info as any)?.hallucinated_statements) ? { hallucinated_statements: (hal?.info as any).hallucinated_statements } : {}),
+      ...(((hal?.info as any)?.verified_statements) ? { verified_statements: (hal?.info as any).verified_statements } : {}),
+      ...((hal?.executionFailed && (hal?.info as any)?.error) ? { error: (hal?.info as any).error } : {}),
     },
   };
 }
-// ------------------------------------------------------------
 
 const ClassifierSchema = z.object({ classification: z.enum(["Product_catalogue_agent", "Product_selection_agent", "MQL_specialist_agent", "compatibility_and_compliance/safety_agent", "Maintenance_and_coolant-monitoring_agent", "troubleshooting_agent", "forming/forging_process_agent", "corrosion_protection_agent", "grease_and_bearing_agent", "hydraulic_fluids_agent", "disposal/environmental_and_Ops_agent", "sales_and_approvals_agent", "training_and_shop_safety_agent", "data_extraction_and_reporting_agent"]) });
 const productCatalogueAgent = new Agent({
